@@ -1,6 +1,6 @@
 # Multi-Agent Personal Trainer System (LangGraph)
 
-Production-grade, modular multi-agent AI pipeline that generates a personalized workout plan and optionally schedules it on a calendar. The system uses LangGraph for orchestration and OpenAI models for structured JSON outputs.
+This is a project that demonstrates a modular multi-agent pipeline that generates a personalized workout plan and optionally schedules it on a calendar. The system uses LangGraph for orchestration and OpenAI models for structured JSON outputs.
 
 ## What This Project Does
 - Analyzes medical history to identify exercise constraints
@@ -17,41 +17,6 @@ Agents (each returns strict JSON):
 
 Flow:
 - `medical_safety` -> `workout_planning` -> `scheduling` -> `calendar_integration` (conditional)
-
-## Sequence Diagram
-```mermaid
-sequenceDiagram
-    participant User
-    participant Runner as run_example.py
-    participant Graph as LangGraph
-    participant M as MedicalSafetyAgent
-    participant W as WorkoutPlanningAgent
-    participant S as SchedulingAgent
-    participant C as CalendarIntegrationAgent
-    participant Tool as CalendarTool
-
-    User->>Runner: Provide user_profile + user_confirmation
-    Runner->>Graph: invoke(state)
-    Graph->>M: medical_safety(state)
-    M->>M: LLM call + JSON validation
-    M-->>Graph: medical_safety output
-    Graph->>W: workout_planning(state)
-    W->>W: LLM call + JSON validation
-    W-->>Graph: workout_plan output
-    Graph->>S: scheduling(state)
-    S->>S: LLM call + JSON validation
-    S-->>Graph: schedule output
-    alt user_confirmation = true
-        Graph->>C: calendar_integration(state)
-        C->>Tool: create_calendar_event(session)
-        Tool-->>C: event_id + payload
-        C-->>Graph: calendar_events
-    else user_confirmation = false
-        Graph-->>Runner: return state (no events)
-    end
-    Graph-->>Runner: final state
-    Runner-->>User: print JSON result
-```
 
 ## File Guide
 - `pipeline.py`
@@ -95,11 +60,6 @@ python run_example.py
 - Strict JSON is enforced with `JsonOutputParser` + Pydantic validation
 - Invalid model outputs trigger retries with corrective instructions
 - Calendar events are created only if `user_confirmation=True`
-
-## Extending To Production
-- Replace `tools.py` with Google Calendar API + OAuth
-- Add storage for user profiles and plan history
-- Add tests for schedule constraints and agent output validation
 
 ## License
 Internal / private use
