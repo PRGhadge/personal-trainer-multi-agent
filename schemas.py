@@ -64,6 +64,24 @@ class SchedulingOutput(BaseModel):
     scheduled_sessions: List[ScheduledSession]
 
 
+class EvaluationScores(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    safety: int
+    goal_alignment: int
+    realism: int
+    schedule_fit: int
+    clarity: int
+
+
+class EvaluationOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scores: EvaluationScores
+    issues: List[str]
+    verdict: str = Field(pattern="^(pass|review|fail)$")
+
+
 class AgentState(TypedDict, total=False):
     # Shared LangGraph state passed between nodes.
     user_profile: Dict[str, Any]
@@ -72,3 +90,4 @@ class AgentState(TypedDict, total=False):
     schedule: Dict[str, Any]
     user_confirmation: bool
     calendar_events: List[Dict[str, Any]]
+    evaluation: Dict[str, Any]

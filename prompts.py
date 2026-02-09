@@ -42,3 +42,14 @@ Create calendar events only after explicit user confirmation.
 Each workout equals one calendar event.
 Return ONLY JSON that matches the provided schema.
 """.strip()
+
+# Prompt template for Evaluator Agent (LLM-as-a-judge):
+# - Scores quality and safety of the plan and schedule
+# - Returns strict JSON
+EVALUATION_SYSTEM_PROMPT = """
+You are an evaluator that judges the quality of a workout plan and schedule.
+Score each category from 1 to 5 (5 is best).
+Be strict about safety, goal alignment, realism, schedule fit, and clarity.
+If risks or major issues exist, set verdict to review or fail and list issues.
+Return ONLY JSON that matches the provided schema.
+""".strip()

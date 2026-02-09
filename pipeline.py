@@ -21,12 +21,14 @@ from prompts import (
     WORKOUT_PLANNING_SYSTEM_PROMPT,
     SCHEDULING_SYSTEM_PROMPT,
     CALENDAR_INTEGRATION_SYSTEM_PROMPT,
+    EVALUATION_SYSTEM_PROMPT,
 )
 from schemas import (
     UserProfile,
     MedicalSafetyOutput,
     WorkoutPlanOutput,
     SchedulingOutput,
+    EvaluationOutput,
     AgentState,
 )
 from tools import create_calendar_event
@@ -47,7 +49,7 @@ def _call_agent_with_retries(
     user_payload: Dict[str, Any],
     output_model: BaseModel,
     max_retries: int = 2,
-) -> Dict[str, Any]:
+) -> tuple[Dict[str, Any], int]:
     # Enforce strict JSON with a parser + schema validation. Retries if invalid.
     parser = JsonOutputParser(pydantic_object=output_model)
     llm = _llm()
@@ -64,7 +66,7 @@ def _call_agent_with_retries(
         response = llm.invoke(messages)
         try:
             parsed = parser.parse(response.content)
-            return output_model.model_validate(parsed).model_dump()
+            return output_model.model_validate(parsed).model_dump(), attempt
         except (ValidationError, ValueError) as exc:
             last_error = str(exc)
             # Add a short correction instruction and retry.
@@ -88,7 +90,7 @@ def _call_agent_with_retries(
 def medical_safety_agent(state: AgentState) -> AgentState:
     # Agent 1: Analyze medical history and return constraints.
     user_profile = UserProfile.model_validate(state["user_profile"]).model_dump()
-    output = _call_agent_with_retries(
+    output, _retries = _call_agent_with_retries(
         MEDICAL_SAFETY_SYSTEM_PROMPT,
         {"medical_history": user_profile["medical_history"]},
         MedicalSafetyOutput,
@@ -105,7 +107,7 @@ def workout_planning_agent(state: AgentState) -> AgentState:
         "short_term_goals": user_profile["short_term_goals"],
         "long_term_goals": user_profile["long_term_goals"],
     }
-    output = _call_agent_with_retries(
+    output, _retries = _call_agent_with_retries(
         WORKOUT_PLANNING_SYSTEM_PROMPT,
         payload,
         WorkoutPlanOutput,
@@ -121,7 +123,7 @@ def scheduling_agent(state: AgentState) -> AgentState:
         "workout_plan": state["workout_plan"],
         "availability": user_profile["availability"],
     }
-    output = _call_agent_with_retries(
+    output, _retries = _call_agent_with_retries(
         SCHEDULING_SYSTEM_PROMPT,
         payload,
         SchedulingOutput,
@@ -145,6 +147,23 @@ def calendar_integration_agent(state: AgentState) -> AgentState:
     return state
 
 
+def evaluation_agent(state: AgentState) -> AgentState:
+    # Evaluator agent: LLM-as-a-judge for plan and schedule quality.
+    payload = {
+        "medical_safety": state["medical_safety"],
+        "workout_plan": state["workout_plan"],
+        "schedule": state["schedule"],
+    }
+    output, _retries = _call_agent_with_retries(
+        EVALUATION_SYSTEM_PROMPT,
+        payload,
+        EvaluationOutput,
+    )
+
+    state["evaluation"] = output
+    return state
+
+
 # -------------------------
 # Graph construction
 # -------------------------
@@ -156,18 +175,21 @@ def build_graph() -> StateGraph:
     graph.add_node("medical_safety", medical_safety_agent)
     graph.add_node("workout_planning", workout_planning_agent)
     graph.add_node("scheduling", scheduling_agent)
+    graph.add_node("evaluation", evaluation_agent)
     graph.add_node("calendar_integration", calendar_integration_agent)
 
     # Transition: Medical Safety -> Workout Planning
     graph.add_edge("medical_safety", "workout_planning")
     # Transition: Workout Planning -> Scheduling
     graph.add_edge("workout_planning", "scheduling")
+    # Transition: Scheduling -> Evaluation
+    graph.add_edge("scheduling", "evaluation")
 
-    # Transition: Scheduling -> Calendar Integration (conditional)
+    # Transition: Evaluation -> Calendar Integration (conditional)
     def should_create_events(state: AgentState) -> str:
         return "calendar_integration" if state.get("user_confirmation") else END
 
-    graph.add_conditional_edges("scheduling", should_create_events)
+    graph.add_conditional_edges("evaluation", should_create_events)
 
     graph.set_entry_point("medical_safety")
     graph.set_finish_point("calendar_integration")

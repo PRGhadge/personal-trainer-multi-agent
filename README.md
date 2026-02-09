@@ -13,10 +13,11 @@ Agents (each returns strict JSON):
 1. Medical Safety Agent
 2. Workout Planning Agent
 3. Scheduling Agent
-4. Calendar Integration Agent (tool-backed)
+4. Evaluation Agent (LLM-as-a-judge)
+5. Calendar Integration Agent (tool-backed)
 
 Flow:
-- `medical_safety` -> `workout_planning` -> `scheduling` -> `calendar_integration` (conditional)
+- `medical_safety` -> `workout_planning` -> `scheduling` -> `evaluation` -> `calendar_integration` (conditional)
 
 ## File Guide
 - `pipeline.py`
